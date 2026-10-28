@@ -828,7 +828,8 @@
 			</if>
 			<if param="avoid_tunnels">
 				<select value="200" t="tunnel" v="yes"/>
-				<select value="150" t="tunnel" v="avalanche_protector"/>
+				<select value="20" t="tunnel" v="avalanche_protector"/>
+				<select value="70" t="tunnel" v="building_passage"/>
 			</if>
 			<select value="100" t="surface" v="gravel"/>
 
@@ -1910,6 +1911,10 @@
 			<select value="0.5" t="highway" v="trunk"/>
 			<select value="0.5" t="highway" v="trunk_link"/>
 
+			<if param="avoid_tunnels">
+				<select value="0.04" t="tunnel" v="yes"/>
+			</if>
+
 		</way>
 
 		<way attribute="destination_priority">
@@ -2018,7 +2023,8 @@
 		<way attribute="penalty_transition">
 			<if param="avoid_tunnels">
 				<select value="200" t="tunnel" v="yes"/>
-				<select value="150" t="tunnel" v="avalanche_protector"/>
+				<select value="20" t="tunnel" v="avalanche_protector"/>
+				<select value="50" t="tunnel" v="building_passage"/>
 			</if>
 			<if param="driving_style_balance">
 				<select value="5" t="highway" v="residential"/>
@@ -2080,6 +2086,13 @@
 		<parameter id="prefer_hiking_routes" name="Prefer hiking routes" description="Prefer hiking routes" type="boolean"/>
 		<parameter id="prefer_tactile_paving" name="Prefer tactile paving" description="Prefer tactile paving" type="boolean"/>
 
+		<!-- NEW: Avoid dangerous trails in the rain -->
+		<!-- In memory of a 17-year-old friend lost on wet rock -->
+		<parameter id="avoid_dangerous_wet_trails"
+			name="Avoid dangerous wet trails"
+			description="Avoids bare rock, steep slopes, high sac_scale and CAI trails when wet. Enable when it rains or trails are wet. Best combined with elevation data enabled."
+			type="boolean"/>
+
 		<way attribute="area">
 			<select value="1"  t="railway" v="platform"/>
 			<select value="1"  t="public_transport" v="platform"/>
@@ -2117,6 +2130,7 @@
 			<select value="-1" t="access" v="no"/>
 			<if param="allow_private">
 				<select value="1"  t="access" v="private"/>
+				<select value="1" t="locked" v="yes"/>
 			</if>
 			<select value="-1" t="access" v="private"/>
 			<select value="1"  t="access" v="yes"/>
@@ -2176,6 +2190,37 @@
 		<way attribute="obstacle_srtm_alt_speed">
 			<if param="height_obstacles">
 				<select value="0" t="highway" v="via_ferrata"/>
+
+				<!-- *** AVOID DANGEROUS WET TRAILS - slope penalties *** -->
+				<!-- Descents penalized MORE than climbs: on rock/grass   -->
+				<!-- On a wet trail, the descent is fatal.                -->
+				<!-- Values in seconds per meter of elevation gain.       -->
+				<if param="avoid_dangerous_wet_trails">
+					<!-- Descent > 60%: practically impassable in safety -->
+					<ge value1="-100" value2=":incline"><select value="80"/></ge>
+					<!-- 35-60% descent: extremely dangerous -->
+					<ge value1="-60" value2=":incline"><select value="50"/></ge>
+					<!-- 17-35% descent: very dangerous -->
+					<ge value1="-35" value2=":incline"><select value="30"/></ge>
+					<!-- 9-17% drop: be careful -->
+					<ge value1="-17" value2=":incline"><select value="15"/></ge>
+					<!-- 3-9% drop: slight penalty -->
+					<ge value1="-9" value2=":incline"><select value="5"/></ge>
+					<!-- Flat / gentle climb: no extra penalty -->
+					<ge value1="3" value2=":incline"><select value="0"/></ge>
+					<!-- 3-9% increase -->
+					<ge value1="9" value2=":incline"><select value="5"/></ge>
+					<!-- 9-17% increase -->
+					<ge value1="17" value2=":incline"><select value="12"/></ge>
+					<!-- 17-35% increase -->
+					<ge value1="35" value2=":incline"><select value="25"/></ge>
+					<!-- Climb > 60%: almost climbing -->
+					<ge value1="60" value2=":incline"><select value="45"/></ge>
+					<!-- Unknown slope: moderate precautionary penalty -->
+					<select value="8"/>
+				</if>
+				<!-- *** END block wet trails slope *** -->
+
 				<ge value1="-100" value2=":incline">
 					<select value="40"/>
 				</ge>
@@ -2253,10 +2298,72 @@
 			<select value="1.1" t="foot" v="designated"/>
 			<select value="1.2" t="sidewalk" v="yes"/>
 			<select value="0.9" t="sidewalk" v="no"/>
+			<!-- Prefer footways and paths over roads (custom) -->
+			<select value="1.5" t="highway" v="pedestrian"/>
+			<select value="1.5" t="highway" v="footway"/>
+			<select value="1.4" t="highway" v="cycleway"/>
+			<select value="1.3" t="highway" v="path"/>
+			<select value="1.2" t="highway" v="living_street"/>
+			<select value="0.9" t="highway" v="residential"/>
+			<select value="0.8" t="highway" v="tertiary"/>
+			<select value="0.4" t="highway" v="secondary"/>
+			<select value="0.1" t="highway" v="primary"/>
+			<select value="0.1" t="highway" v="primary_link"/>
 
 			<if param="avoid_tunnels">
-				<select value="0.02" t="tunnel" v="yes"/>
+				<select value="0.05" t="tunnel" v="yes"/>
 			</if>
+
+			<!-- *** AVOID DANGEROUS WET TRAILS - surface + scale penalties *** -->
+			<!-- Surfaces ranked from least to most dangerous with rain -->
+			<if param="avoid_dangerous_wet_trails">
+				<!-- Fine gravel: fairly compact, decent grip -->
+				<select value="0.85" t="surface" v="fine_gravel"/>
+				<!-- Gravel: slippery but manageable -->
+				<select value="0.75" t="surface" v="gravel"/>
+				<!-- Compacted soil: it softens when wet -->
+				<select value="0.70" t="surface" v="compacted"/>
+				<!-- Earth/Soil: muddy when wet -->
+				<select value="0.65" t="surface" v="dirt"/>
+				<select value="0.65" t="surface" v="earth"/>
+				<select value="0.65" t="surface" v="ground"/>
+				<!-- Pebblestone: round, slippery, wet -->
+				<select value="0.45" t="surface" v="pebblestone"/>
+				<!-- Paving/cobblestones: convex stones, dangerous when wet -->
+				<select value="0.40" t="surface" v="cobblestone"/>
+				<select value="0.40" t="surface" v="sett"/>
+				<!-- Grass: very treacherous on wet slopes -->
+				<select value="0.30" t="surface" v="grass"/>
+				<!-- Mud: almost impassable safely -->
+				<select value="0.20" t="surface" v="mud"/>
+				<!-- Rock: high risk -->
+				<select value="0.15" t="surface" v="rock"/>
+				<select value="0.15" t="surface" v="rocky"/>
+				<!-- LIVE ROCK: maximum danger -->
+				<select value="0.05" t="surface" v="bare_rock"/>
+
+				<!-- SAC_SCALE: prefer easier trails in rain -->
+				<!-- T1 hiking: no penalty, it's the safe target -->
+				<!-- T2 mountain_hiking: slight penalty -->
+				<select value="0.80" t="sac_scale" v="mountain_hiking"/>
+				<!-- T3 demanding mountain hiking: significant penalty -->
+				<select value="0.40" t="sac_scale" v="demanding_mountain_hiking"/>
+				<!-- T4 alpine_hiking: strongly discouraged in rain -->
+				<select value="0.15" t="sac_scale" v="alpine_hiking"/>
+				<!-- T5-T6: practically excluded with rain -->
+				<select value="0.05" t="sac_scale" v="demanding_alpine_hiking"/>
+				<select value="0.02" t="sac_scale" v="difficult_alpine_hiking"/>
+
+				<!-- CAI SCALE (Italian) -->
+				<!-- T (Tourist): no penalty -->
+				<!-- E (Hiking): slight penalty -->
+				<select value="0.80" t="cai_scale" v="E"/>
+				<!-- EE (Expert Hiker): significant penalty -->
+				<select value="0.40" t="cai_scale" v="EE"/>
+				<!-- EEA (Equipped Expert Hiker): almost blocked by rain -->
+				<select value="0.10" t="cai_scale" v="EEA"/>
+			</if>
+			<!-- *** END wet trails priority block *** -->
 
 			<!-- object tags -->
 			<if param="prefer_tactile_paving">
@@ -2271,14 +2378,9 @@
 			<select value="0.7" t="highway" v="trunk_link"/>
 			<select value="0.8" t="highway" v="bridleway"/>
 			<select value="0.9" t="highway" v="service"/>
-			<select value="0.9" t="highway" v="primary"/>
-			<select value="0.9" t="highway" v="primary_link"/>
-			<select value="0.9" t="highway" v="secondary"/>
 			<select value="0.9" t="highway" v="secondary_link"/>
-			<select value="0.9" t="highway" v="tertiary"/>
 			<select value="0.9" t="highway" v="tertiary_link"/>
-			<select value="1"   t="route"   v="ferry"/>
-			<select value="1.1" t="highway" v="residential"/>
+			<select value="1" t="route" v="ferry"/>
 			<if param="avoid_unpaved">
 				<select value="0.4" t="tracktype" v="grade2"/>
 				<select value="0.1" t="tracktype" v="grade3"/>
@@ -2298,10 +2400,6 @@
 			</if>
 			<select value="1.25" t="highway" v="elevator"/>
 			<select value="1.2" t="highway" v="steps"/>
-			<select value="1.2" t="highway" v="living_street"/>
-			<select value="1.2" t="highway" v="pedestrian"/>
-			<select value="1.2" t="highway" v="footway"/>
-			<select value="1.2" t="highway" v="path"/>
 
 
 			<select value="1"/>
@@ -2330,28 +2428,45 @@
 			<select value="-1" t="access" v="no"/>
 			<if param="allow_private">
 				<select value="180"  t="access" v="private"/>
+				<select value="180" t="locked" v="yes"/>
 			</if>
 			<select value="-1"  t="access" v="private"/>
+			<select value="500" t="locked" v="yes"/>
 			<select value="120"  t="access" v="destination"/>
 
 			<select value="0"  t="access" v="yes"/>
 			<select value="0"  t="access" v="permissive"/>
 			<select value="300" t="amenity" v="ferry_terminal"/>
-
-			<ifnot param="allow_private">
-				<select value="-1" t="locked" v="yes"/>
-			</ifnot>
-			<if param="allow_private">
-				<select value="180" t="locked" v="yes"/>
-			</if>
 		</point>
 
 		<way attribute="penalty_transition">
 			<if param="avoid_tunnels">
-				<select value="200" t="tunnel" v="yes"/>
-				<select value="150" t="tunnel" v="avalanche_protector"/>
+				<select value="150" t="tunnel" v="yes"/>
+				<select value="20" t="tunnel" v="avalanche_protector"/>
+				<select value="70" t="tunnel" v="building_passage"/>
 			</if>
-			<select value="0" t="route"   v="ferry"/>
+
+			<!-- *** AVOID DANGEROUS WET TRAILS - transition penalties *** -->
+			<!-- Additional cost when the router enters a dangerous segment:  -->
+			<!-- discourages it even if it's the only nearby option.         -->
+			<if param="avoid_dangerous_wet_trails">
+				<select value="500" t="surface" v="bare_rock"/>
+				<select value="300" t="surface" v="rock"/>
+				<select value="300" t="surface" v="rocky"/>
+				<select value="200" t="surface" v="grass"/>
+				<select value="180" t="surface" v="mud"/>
+				<select value="150" t="surface" v="cobblestone"/>
+				<select value="150" t="surface" v="pebblestone"/>
+				<select value="120" t="surface" v="sett"/>
+				<select value="400" t="sac_scale" v="demanding_alpine_hiking"/>
+				<select value="200" t="sac_scale" v="alpine_hiking"/>
+				<select value="150" t="sac_scale" v="demanding_mountain_hiking"/>
+				<select value="400" t="cai_scale" v="EEA"/>
+				<select value="200" t="cai_scale" v="EE"/>
+			</if>
+			<!-- *** END block wet trails transition *** -->
+
+			<select value="0" t="route" v="ferry"/>
 			<select value="0" t="highway" v="steps"/>
 			<select value="0" t="highway" v="elevator"/>
 			<select value="0" t="highway" v="living_street"/>
@@ -2663,7 +2778,8 @@
 		<way attribute="penalty_transition">
 			<if param="avoid_tunnels">
 				<select value="200" t="tunnel" v="yes"/>
-				<select value="150" t="tunnel" v="avalanche_protector"/>
+				<select value="20" t="tunnel" v="avalanche_protector"/>
+				<select value="50" t="tunnel" v="building_passage"/>
 			</if>
 		</way>
 	</routingProfile>
